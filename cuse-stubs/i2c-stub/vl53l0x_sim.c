@@ -44,11 +44,9 @@ static void update_range_result(void) {
 }
 
 uint8_t vl53l0x_sim_read_reg(uint8_t reg) {
-    if (reg == REG_RESULT_RANGE_STATUS || reg == 0x1E || reg == 0x1F) {
-        if (measurement_pending) {
-            update_range_result();
-            measurement_pending = 0;
-        }
+    if (measurement_pending) {
+        update_range_result();
+        measurement_pending = 0;
     }
     return regs[reg];
 }
