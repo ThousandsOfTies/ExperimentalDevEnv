@@ -1,0 +1,12 @@
+# SSH keys - never commit
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
+# SSH config (personal, contains IPs)
+.ssh/
+
+# Build artifacts
+cuse-stubs/i2c-stub/cuse_i2c
+cuse-stubs/test/vl53l0x_read
