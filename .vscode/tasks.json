@@ -1,0 +1,51 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start Hardware Bridge",
+      "type": "shell",
+      "command": "pip install -q -r cuse-stubs/web-bridge/requirements.txt && python3 cuse-stubs/web-bridge/bridge.py",
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "hardware"
+      },
+      "runOptions": {
+        "runOn": "default"
+      }
+    },
+    {
+      "label": "Open Hardware Panel",
+      "type": "shell",
+      "command": "sleep 1",
+      "dependsOn": "Start Hardware Bridge",
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent" }
+    },
+    {
+      "label": "Run GPIO Demo (EC2)",
+      "type": "shell",
+      "command": "cd cuse-stubs/gpio-shim && LD_PRELOAD=./gpio_shim.so ../test/gpio_led_button",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "hardware"
+      }
+    },
+    {
+      "label": "Run VL53L0X Demo (EC2)",
+      "type": "shell",
+      "command": "sudo ./cuse_i2c -f --devname=i2c-1 & sleep 1 && ./vl53l0x_read /dev/i2c-1",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "hardware"
+      }
+    }
+  ]
+}

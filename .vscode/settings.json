@@ -1,0 +1,12 @@
+{
+  "simpleBrowser.focusLockIndicator.enabled": true,
+  "livePreview.portNumber": 8080,
+
+  "remote.SSH.serverInstallPath": {
+    "vibecode-graviton": "/home/ubuntu"
+  },
+
+  "ports.autoForwardPorts": true,
+  "remote.autoForwardPorts": true,
+  "remote.autoForwardPortsSource": "process"
+}
