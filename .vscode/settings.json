@@ -8,5 +8,9 @@
 
   "ports.autoForwardPorts": true,
   "remote.autoForwardPorts": true,
-  "remote.autoForwardPortsSource": "process"
+  "remote.autoForwardPortsSource": "process",
+  "remote.portsAttributes": {
+    "8080": { "label": "Hardware Panel (HTTP)", "onAutoForward": "silent" },
+    "8765": { "label": "Hardware Panel (WS)",   "onAutoForward": "silent" }
+  }
 }
