@@ -1,11 +1,16 @@
 CC     = gcc
 CFLAGS = -Wall -O2
-BIN    = vl53l0x_read
+BINS   = vl53l0x_read gpio_led_button
 
-$(BIN): vl53l0x_read.c
+all: $(BINS)
+
+vl53l0x_read: vl53l0x_read.c
+	$(CC) $(CFLAGS) -o $@ $^
+
+gpio_led_button: gpio_led_button.c
 	$(CC) $(CFLAGS) -o $@ $^
 
 clean:
-	rm -f $(BIN)
+	rm -f $(BINS)
 
-.PHONY: clean
+.PHONY: all clean
