@@ -35,6 +35,8 @@ sequenceDiagram
         Dev->>GH: ExperimentalDevEnv リポジトリを fork / clone
         Dev->>Win: Antigravity (VSCode互換) インストール
         Dev->>Win: AWS CLI インストール (winget install Amazon.AWSCLI)
+        Dev->>Win: GitHub CLI インストール (winget install GitHub.cli)
+        Dev->>Win: gh auth login (ブラウザで GitHub 認証)
         Dev->>EC2: AWSアカウント作成
         Dev->>EC2: EC2インスタンス作成<br/>(Ubuntu 24.04 arm64, t4g.small, ap-southeast-2)
         EC2-->>Dev: キーペア vibecode-graviton.pem ダウンロード
@@ -115,6 +117,10 @@ sequenceDiagram
 
 | フェーズ | 場所 | コマンド |
 |---|---|---|
+| GitHub CLI インストール | Windows PS | `winget install GitHub.cli` |
+| GitHub CLI 認証 | Windows PS | `gh auth login` |
+| AWS CLI インストール | Windows PS | `winget install Amazon.AWSCLI` |
+| AWS CLI 認証設定 | Windows PS | `aws configure` |
 | EC2 起動 | Windows PS | `.\ec2.ps1 start` |
 | EC2 停止 | Windows PS | `.\ec2.ps1 stop` |
 | EC2 状態確認 | Windows PS | `.\ec2.ps1 status` |
