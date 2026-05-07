@@ -77,58 +77,60 @@ sequenceDiagram
     end
 
     rect rgb(20, 60, 60)
-        Note over GH,RPi: 【成果物デプロイ】ビルド後
-        alt EC2 へデプロイ
-            Dev->>GH: make deploy EC2=vibecode-graviton
-            GH->>EC2: scp gpio_shim.so / gpio_led_button<br/>cuse_i2c / vl53l0x_read / web-bridge/
-            EC2-->>GH: "Deploy complete"
-        else RasPi5 へデプロイ
-            Dev->>GH: make deploy EC2=pi@raspberrypi KEY=~/.ssh/raspi.pem
-            GH->>RPi: scp gpio_led_button / cuse_i2c / vl53l0x_read
-            RPi-->>GH: "Deploy complete"
-        end
+        Note over GH,EC2: 【EC2】デプロイ
+        Dev->>GH: make deploy EC2=vibecode-graviton
+        GH->>EC2: scp gpio_shim.so / gpio_led_button<br/>cuse_i2c / vl53l0x_read / web-bridge/
+        EC2-->>GH: "Deploy complete"
     end
 
     rect rgb(40, 60, 30)
-        Note over Dev,RPi: 【実行】
-        alt EC2 (シミュレーション)
-            Dev->>EC2: ssh vibecode-graviton (ターミナル①)
-            Dev->>EC2: ~/venv/bin/python3 ~/web-bridge/bridge.py
-            EC2-->>Dev: [bridge] /tmp/hw_sim.sock<br/>[bridge] ws://0.0.0.0:8765 / :8080
-
-            Dev->>EC2: ssh vibecode-graviton (ターミナル②)
-            Dev->>EC2: LD_PRELOAD=~/gpio_shim.so ~/gpio_led_button
-            EC2-->>Dev: [gpio_shim] loaded
-            loop LED 自動点滅 (100ms毎)
-                EC2->>EC2: Unix socket 経由で bridge へ LED 状態送信
-            end
-        else RasPi5 (実機)
-            Dev->>RPi: ssh pi@raspberrypi
-            Dev->>RPi: ./gpio_led_button
-            RPi-->>Dev: GPIO LED+Button demo. Press Ctrl+C to quit.
-            loop LED 自動点滅 (100ms毎)
-                RPi->>RPi: 実 GPIO18 に出力 → LED 点滅
-            end
+        Note over Dev,EC2: 【EC2】実行
+        Dev->>EC2: ssh vibecode-graviton (ターミナル①)
+        Dev->>EC2: ~/venv/bin/python3 ~/web-bridge/bridge.py
+        EC2-->>Dev: [bridge] /tmp/hw_sim.sock<br/>[bridge] ws://0.0.0.0:8765 / :8080
+        Dev->>EC2: ssh vibecode-graviton (ターミナル②)
+        Dev->>EC2: LD_PRELOAD=~/gpio_shim.so ~/gpio_led_button
+        EC2-->>Dev: [gpio_shim] loaded
+        loop LED 自動点滅 (100ms毎)
+            EC2->>EC2: Unix socket 経由で bridge へ LED 状態送信
         end
     end
 
     rect rgb(60, 50, 20)
-        Note over Dev,RPi: 【操作・観察】
-        alt EC2 (シミュレーション)
-            Dev->>Win: Antigravity: Remote-SSH → vibecode-graviton
-            Win->>EC2: SSH 接続 + ポート自動転送<br/>(8080: HTTP / 8765: WebSocket)
-            Dev->>Win: PORTS タブ → 8080 を Simple Browser で開く
-            Win->>Panel: http://localhost:8080
-            Panel->>EC2: WebSocket 接続 (ws://localhost:8765)
-            EC2-->>Panel: LED 状態をリアルタイム送信
-            Panel-->>Dev: LED 点滅をパネルで可視化
-            Dev->>Panel: PUSH ボタンをクリック
-            Panel->>EC2: {"type":"button","line":17,"value":1}
-            EC2-->>Panel: LED トグル → パネル反映
-        else RasPi5 (実機)
-            Dev->>RPi: 物理ボタン (GPIO17) を押す
-            RPi-->>Dev: 実 LED (GPIO18) がトグル点灯
+        Note over Dev,Panel: 【EC2】操作・観察
+        Dev->>Win: Antigravity: Remote-SSH → vibecode-graviton
+        Win->>EC2: SSH 接続 + ポート自動転送<br/>(8080: HTTP / 8765: WebSocket)
+        Dev->>Win: PORTS タブ → 8080 を Simple Browser で開く
+        Win->>Panel: http://localhost:8080
+        Panel->>EC2: WebSocket 接続 (ws://localhost:8765)
+        EC2-->>Panel: LED 状態をリアルタイム送信
+        Panel-->>Dev: LED 点滅をパネルで可視化
+        Dev->>Panel: PUSH ボタンをクリック
+        Panel->>EC2: {"type":"button","line":17,"value":1}
+        EC2-->>Panel: LED トグル → パネル反映
+    end
+
+    rect rgb(20, 50, 60)
+        Note over GH,RPi: 【RasPi5】デプロイ
+        Dev->>GH: make deploy EC2=pi@raspberrypi KEY=~/.ssh/raspi.pem
+        GH->>RPi: scp gpio_led_button / cuse_i2c / vl53l0x_read
+        RPi-->>GH: "Deploy complete"
+    end
+
+    rect rgb(30, 60, 50)
+        Note over Dev,RPi: 【RasPi5】実行
+        Dev->>RPi: ssh pi@raspberrypi
+        Dev->>RPi: ./gpio_led_button
+        RPi-->>Dev: GPIO LED+Button demo. Press Ctrl+C to quit.
+        loop LED 自動点滅 (100ms毎)
+            RPi->>RPi: 実 GPIO18 に出力 → LED 点滅
         end
+    end
+
+    rect rgb(50, 60, 30)
+        Note over Dev,RPi: 【RasPi5】操作・観察
+        Dev->>RPi: 物理ボタン (GPIO17) を押す
+        RPi-->>Dev: 実 LED (GPIO18) がトグル点灯
     end
 ```
 
