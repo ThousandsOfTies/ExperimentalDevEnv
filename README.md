@@ -1,57 +1,43 @@
 # ExperimentalDevEnv
 
-研究PoC用サンドボックス。CUSEスタブを使ってクラウド上でH/Wをシミュレーションし、
-同一バイナリ・同一スクリプトがEC2 arm64と実機(RasPi5)で透過的に動くことを実証する。
+組み込みソフトウェア開発の「完全クラウド化」と「シームレスな実機デプロイ」を実現するためのPoC（概念実証）サンドボックスです。
 
-## 構成
+このリポジトリは、**「実機がなくてもクラウド上でハードウェア込みのテストができ、実機が手に入った際も同じバイナリをそのまま流し込める」**という開発体験を目指して設計されています。
 
-```
-cuse-stubs/
-├── i2c-stub/          # CUSE-based /dev/i2c-1 スタブ (VL53L0X ToFセンサーシミュレーション)
-│   ├── cuse_i2c.c
-│   ├── vl53l0x_sim.c
-│   ├── vl53l0x_sim.h
-│   └── Makefile
-├── test/
-│   ├── vl53l0x_read.c # 動確用クライアント（EC2/RasPi5共通バイナリ）
-│   └── Makefile
-└── SETUP.md           # EC2セットアップ手順
-setup_ssh.sh           # CodespacesからEC2へのSSH設定スクリプト
-ssh_config.template    # SSH configテンプレート
-```
+## ドキュメント ナビゲーション
 
-## ターゲット環境
+### 📖 [1. アーキテクチャコンセプト (01_ARCHITECTURE.md)](docs/01_ARCHITECTURE.md)
+* なぜ「クラウド化」なのか？
+* Codespaces (ビルド) + EC2 Graviton (シミュレーション) + SSH/scp (デプロイ) の全体像と設計思想。
 
-| 環境 | 役割 |
-|------|------|
-| Codespaces (x86_64) | aarch64クロスコンパイル |
-| EC2 t4g.small (arm64) | CUSEスタブで実行・動確 |
-| RasPi5 (arm64) | 実機動確 |
+### 🔄 [2. 開発ワークフローとシーケンス (02_WORKFLOW.md)](docs/02_WORKFLOW.md)
+* 開発者がコードを書いてから、シミュレータや実機で動かすまでの具体的なシーケンス図。
+* コマンドリファレンス。
 
-## クイックスタート
+### 🛠️ [3. ハードウェアシミュレーション設定 (03_SIMULATION_SETUP.md)](docs/03_SIMULATION_SETUP.md)
+* `cuse-stubs` を用いたI2C/GPIOスタブの仕組み。
+* EC2上でのWebブリッジ起動方法と、Antigravity（ブラウザ）でのVirtual Hardware Panelの使い方。
 
-### 1. Codespacesでクロスコンパイル
+---
 
-```bash
-sudo apt install gcc-aarch64-linux-gnu libfuse3-dev
+## クイックスタート概要
 
-cd cuse-stubs/i2c-stub && make CC=aarch64-linux-gnu-gcc
-cd ../test            && make CC=aarch64-linux-gnu-gcc
-```
+1. **Codespaces (x86_64) で開発・クロスコンパイル**
+   ```bash
+   cd cuse-stubs && make cross
+   ```
 
-### 2. EC2へ転送・実行
+2. **EC2 / RasPi5 へデプロイ**
+   ```bash
+   # EC2 へ
+   make deploy EC2=vibecode-graviton
 
-```bash
-# SSH設定
-bash setup_ssh.sh <EC2_PUBLIC_IP>
+   # RasPi5 へ
+   make deploy EC2=pi@raspberrypi KEY=~/.ssh/raspi.pem
+   ```
 
-# バイナリ転送
-scp cuse-stubs/i2c-stub/cuse_i2c  vibecode-graviton:~/
-scp cuse-stubs/test/vl53l0x_read  vibecode-graviton:~/
-
-# EC2でスタブ起動 → クライアント実行
-ssh vibecode-graviton "sudo modprobe cuse && sudo ./cuse_i2c -f --devname=i2c-1 &"
-ssh vibecode-graviton "./vl53l0x_read /dev/i2c-1"
-```
-
-詳細は [cuse-stubs/SETUP.md](cuse-stubs/SETUP.md) を参照。
+3. **SSH でシェルに入って実行**
+   ```bash
+   ssh vibecode-graviton
+   LD_PRELOAD=~/gpio_shim.so ~/gpio_led_button
+   ```
