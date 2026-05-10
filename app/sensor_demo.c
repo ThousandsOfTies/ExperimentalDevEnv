@@ -90,6 +90,7 @@ static void render(int oled_fd, int system_on, const char *uid_text, int scan_co
 }
 
 int main(void) {
+    setvbuf(stdout, NULL, _IOLBF, 0);
     signal(SIGINT,  on_signal);
     signal(SIGTERM, on_signal);
 

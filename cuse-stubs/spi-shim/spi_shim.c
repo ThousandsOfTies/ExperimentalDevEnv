@@ -131,9 +131,13 @@ static void simulate_transceive(void) {
         return;
     }
 
+    uint8_t cmd_byte = fifo[0];
+
     /* Check card presence via bridge */
     uint8_t uid[4];
     int present = bridge_get_card(uid);
+    fprintf(stderr, "[spi_shim] transceive cmd=0x%02x present=%d uid=%02X:%02X:%02X:%02X\n",
+            cmd_byte, present, uid[0], uid[1], uid[2], uid[3]);
 
     if (!present) {
         regs[COM_IRQ_REG] |= 0x01;   /* TimerIRq → no card */
@@ -142,7 +146,7 @@ static void simulate_transceive(void) {
     }
 
     /* Decide response based on first FIFO byte */
-    uint8_t cmd = fifo[0];
+    uint8_t cmd = cmd_byte;
     fifo_r = fifo_w = 0;
 
     if (cmd == PICC_REQA) {
