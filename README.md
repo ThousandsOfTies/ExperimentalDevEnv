@@ -21,6 +21,10 @@
 ### 🔌 [4. 実機の配線 (04_HARDWARE_WIRING.md)](docs/04_HARDWARE_WIRING.md)
 * RasPi5 とブレッドボードを使った LED / ボタン / I2C / SPI モジュールの配線図。
 
+### 🎯 [5. PoC 成果まとめ (05_RESULTS.md)](docs/05_RESULTS.md)
+* EC2 上でのフルシミュレーション動作確認結果と RasPi5 実機での個別検証結果。
+* 実装したコンポーネントと得られた知見。
+
 ---
 
 ## クイックスタート概要
