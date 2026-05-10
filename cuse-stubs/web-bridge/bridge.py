@@ -35,6 +35,7 @@ state = {
     },
     "i2c": {
         "vl53l0x": {"range_mm": 300, "status": 0x01},
+        "ssd1306": {"framebuf": None},   # 128x64 monochrome (1024 bytes)
     },
     "spi": {
         "mfrc522": {"uid": None, "present": False},
@@ -122,6 +123,11 @@ def handle_stub_message(raw: str, loop) -> str | None:
         state["spi"]["lcd"]["pixels"] = msg.get("pixels")
         asyncio.run_coroutine_threadsafe(
             broadcast({"type": "lcd", "pixels": msg.get("pixels")}), loop)
+
+    elif event == "set" and device == "oled":
+        state["i2c"]["ssd1306"]["framebuf"] = msg.get("framebuf")
+        asyncio.run_coroutine_threadsafe(
+            broadcast({"type": "oled", "framebuf": msg.get("framebuf")}), loop)
 
     elif msg.get("req") == "get" and device == "gpio":
         line = msg.get("line")

@@ -44,6 +44,9 @@ function handleMessage(msg) {
     case "lcd":
       if (msg.pixels) drawLcd(msg.pixels);
       break;
+    case "oled":
+      if (msg.framebuf) drawOled(msg.framebuf);
+      break;
   }
 }
 
@@ -111,6 +114,30 @@ function sendRfidTap() {
 
 function sendRfidRemove() {
   send({ type: "rfid_remove" });
+}
+
+/* ---- OLED (SSD1306 128x64 monochrome) ---- */
+function drawOled(framebufB64) {
+  const canvas = document.getElementById("oled-canvas");
+  const ctx = canvas.getContext("2d");
+  const bytes = Uint8Array.from(atob(framebufB64), c => c.charCodeAt(0));
+  const imgData = ctx.createImageData(128, 64);
+  /* SSD1306 layout: 8 pages × 128 columns, each byte = 8 vertical pixels (LSB top) */
+  for (let page = 0; page < 8; page++) {
+    for (let col = 0; col < 128; col++) {
+      const b = bytes[page * 128 + col];
+      for (let bit = 0; bit < 8; bit++) {
+        const y = page * 8 + bit;
+        const px = (b >> bit) & 1;
+        const idx = (y * 128 + col) * 4;
+        imgData.data[idx + 0] = px ? 0x88 : 0x00;
+        imgData.data[idx + 1] = px ? 0xCC : 0x00;
+        imgData.data[idx + 2] = px ? 0xFF : 0x10;
+        imgData.data[idx + 3] = 255;
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
 }
 
 /* ---- LCD ---- */
