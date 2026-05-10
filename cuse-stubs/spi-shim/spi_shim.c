@@ -95,12 +95,17 @@ static int bridge_get_card(uint8_t *uid_out) {
     int n = read(s, resp, sizeof(resp) - 1);
     if (n <= 0) return 0;
 
-    /* Parse "present":true and "uid":"XX:XX:XX:XX" */
-    char *p = strstr(resp, "\"present\":true");
+    /* Parse "present": true and "uid": "XX:XX:XX:XX" (handle whitespace) */
+    char *p = strstr(resp, "\"present\"");
     if (!p) return 0;
-    p = strstr(resp, "\"uid\":\"");
+    p += 9;
+    while (*p == ' ' || *p == ':') p++;
+    if (strncmp(p, "true", 4) != 0) return 0;
+
+    p = strstr(resp, "\"uid\"");
     if (!p) return 0;
-    p += 7;
+    p += 5;
+    while (*p == ' ' || *p == ':' || *p == '"') p++;
     /* Parse UID hex bytes separated by ':' */
     for (int i = 0; i < 4; i++) {
         if (!*p) return 0;
