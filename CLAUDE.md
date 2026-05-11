@@ -2,8 +2,9 @@
 
 ## プロジェクト概要
 
-組み込みHWシミュレーション開発環境。
+組み込み H/W シミュレーション開発環境。
 Codespaces でクロスコンパイルし、EC2（シミュレーション）または RasPi5（実機）で動かす。
+同じバイナリ (`sensor_demo`) が両環境で動作することを実証済み。
 
 ---
 
@@ -28,24 +29,21 @@ Codespaces でクロスコンパイルし、EC2（シミュレーション）ま
 
 ### 「EC2 にデプロイして」と言われたら
 
-1. Codespaces に SSH でログイン
-2. ビルド・デプロイ実行:
-   ```bash
-   cd /workspaces/ExperimentalDevEnv/cuse-stubs
-   make cross
-   make deploy EC2=vibecode-graviton
-   ```
-   経路: Codespaces → scp → EC2（クラウド同士で直接転送）
+```bash
+gh codespace ssh --codespace glowing-capybara-5j6g4594j75c44j -- \
+  "cd /workspaces/ExperimentalDevEnv && make cross && make deploy-ec2 EC2=vibecode-graviton"
+```
+
+経路: Codespaces → scp → EC2（クラウド同士で直接転送）
 
 ### 「実機にデプロイして」と言われたら
 
-1. Codespaces に SSH でログイン
-2. ビルド実行:
+1. Codespaces でビルド:
    ```bash
-   cd /workspaces/ExperimentalDevEnv/cuse-stubs
-   make cross
+   gh codespace ssh --codespace glowing-capybara-5j6g4594j75c44j -- \
+     "cd /workspaces/ExperimentalDevEnv && make cross"
    ```
-3. Windows PowerShell でファイル取得 & 転送:
+2. Windows で取得・転送:
    ```powershell
    .\raspi.ps1 deploy
    ```
@@ -55,23 +53,32 @@ Codespaces でクロスコンパイルし、EC2（シミュレーション）ま
 
 ## 実行手順
 
-### EC2 での実行
+### EC2 でシミュレーション起動（3 プロセス並行）
+
 ```bash
-# ターミナル①: ブリッジ起動
 ssh vibecode-graviton
+
+# ターミナル①: ブリッジ
 ~/venv/bin/python3 ~/web-bridge/bridge.py
 
-# ターミナル②: GPIO デモ
-ssh vibecode-graviton
-LD_PRELOAD=~/gpio_shim.so ~/gpio_led_button
+# ターミナル②: I2C CUSE スタブ
+sudo ~/cuse_i2c -f --devname=i2c-1
+sudo chmod 666 /dev/i2c-1
+
+# ターミナル③: アプリ本体（シム経由）
+LD_PRELOAD="$HOME/gpio_shim.so $HOME/spi_shim.so" ~/sensor_demo
 ```
+
 Antigravity で Remote SSH → vibecode-graviton → PORTS タブ 8080 を Simple Browser で開く。
 
-### RasPi5 での実行
+### RasPi5 で実機実行
+
 ```powershell
 adb shell
-# shell 内で
-./gpio_led_button
+```
+```bash
+# adb shell 内
+~/sensor_demo
 ```
 
 ---
@@ -79,7 +86,7 @@ adb shell
 ## EC2 の起動・停止
 
 ```powershell
-.\ec2.ps1 start   # 起動 + SSH config 自動更新
+.\ec2.ps1 start   # 起動 + SSH config 自動更新 + リポジトリ自動 pull
 .\ec2.ps1 stop    # 停止
 .\ec2.ps1 status  # 状態確認
 ```
@@ -90,8 +97,10 @@ adb shell
 
 | ファイル | 用途 |
 |---|---|
-| `gpio_shim.so` | GPIO LD_PRELOAD シム（EC2 用） |
-| `gpio_led_button` | GPIO LED+ボタン デモ |
-| `cuse_i2c` | I2C CUSE スタブ |
-| `vl53l0x_read` | VL53L0X 距離センサー テストクライアント |
-| `web-bridge/` | ハードウェアパネル（Python + HTML） |
+| `app/sensor_demo` | 統合デモアプリ（GPIO + I2C OLED + SPI RFID） |
+| `cuse-stubs/gpio-shim/gpio_shim.so` | GPIO LD_PRELOAD シム（EC2 用） |
+| `cuse-stubs/spi-shim/spi_shim.so` | SPI LD_PRELOAD シム（MFRC-522 sim、EC2 用） |
+| `cuse-stubs/i2c-stub/cuse_i2c` | I2C CUSE スタブ（VL53L0X + SSD1306、EC2 用） |
+| `cuse-stubs/test/gpio_led_button` | GPIO 単機能デモ |
+| `cuse-stubs/test/vl53l0x_read` | VL53L0X 距離センサーテスト |
+| `cuse-stubs/web-bridge/` | Web ブリッジ + HTML パネル |

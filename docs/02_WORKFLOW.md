@@ -1,6 +1,6 @@
 # 開発ワークフロー
 
-SSH/scp を用いたデプロイベースのワークフローです。
+SSH/scp + adb を用いたデプロイベースのワークフローです。
 
 ## システム全体図
 
@@ -8,17 +8,20 @@ SSH/scp を用いたデプロイベースのワークフローです。
 Windows (Antigravity)
   │
   ├─ gh codespace ssh ──→ GitHub Codespaces (x86_64)
-  │                         クロスコンパイル → aarch64バイナリ
-  │                         scp → EC2 / RasPi5
+  │                         クロスコンパイル → aarch64 バイナリ
+  │                         (sensor_demo / shims / cuse_i2c)
   │
-  ├─ Remote SSH ────────→ AWS EC2 arm64 (Graviton)  ← シミュレーション
+  ├─ Codespaces → scp ──→ AWS EC2 arm64 (Graviton)  ← シミュレーション
   │                         bridge.py (port 8080/8765)
-  │                         LD_PRELOAD=gpio_shim.so gpio_led_button
+  │                         cuse_i2c (/dev/i2c-1)
+  │                         LD_PRELOAD="gpio_shim.so spi_shim.so" sensor_demo
   │                           └─ ポートフォワード → Virtual Hardware Panel
   │
-  └─ SSH ───────────────→ Raspberry Pi 5 (arm64)   ← 実機
-                            gpio_led_button (LD_PRELOADなし)
-                            → 実 LED / ボタン
+  ├─ Codespaces → cp → Windows → adb push → Raspberry Pi 5 (arm64)  ← 実機
+  │                                            sensor_demo (シムなし、実 H/W)
+  │                                            → 実 LED / ボタン / OLED / RFID
+  │
+  └─ Remote SSH ────────→ EC2 / RasPi5（編集・観察用）
 ```
 
 ---
@@ -31,66 +34,67 @@ sequenceDiagram
     participant Win as Windows<br/>(Antigravity)
     participant GH as GitHub<br/>(Codespaces)
     participant EC2 as AWS EC2<br/>(シミュレータ)
+    participant Panel as Virtual<br/>Hardware Panel
     participant RPi as Raspberry Pi 5<br/>(実機)
 
     rect rgb(50, 30, 70)
         Note over Dev,GH: 【開発・編集・ビルド】
-        Dev->>GH: C / Python / HTML ソース編集
-        Dev->>GH: cd cuse-stubs && make cross
-        GH-->>Dev: aarch64 バイナリ生成
+        Dev->>GH: ソース編集 (app/, cuse-stubs/)
+        Dev->>GH: cd /workspaces/ExperimentalDevEnv && make cross
+        GH-->>Dev: aarch64 バイナリ生成<br/>(sensor_demo, gpio_shim.so, spi_shim.so, cuse_i2c, ...)
     end
 
     rect rgb(70, 40, 20)
-        Note over GH,EC2: 【EC2】デプロイ
-        Dev->>GH: make deploy EC2=vibecode-graviton
-        GH->>EC2: scp gpio_shim.so / gpio_led_button<br/>cuse_i2c / vl53l0x_read / web-bridge/
-        EC2-->>GH: "Deploy complete"
+        Note over Dev,EC2: 【EC2】起動 + デプロイ
+        Dev->>Win: .\ec2.ps1 start
+        Win->>EC2: 起動 + IP 取得 + SSH config 更新 + 自動 git pull
+        Dev->>GH: make deploy-ec2 EC2=vibecode-graviton
+        GH->>EC2: scp sensor_demo / shims / cuse_i2c / web-bridge/
     end
 
     rect rgb(40, 60, 30)
-        Note over Dev,EC2: 【EC2】実行
-        Dev->>EC2: ssh vibecode-graviton (ターミナル①)
+        Note over Dev,EC2: 【EC2】シミュレータ起動（3 プロセス）
+        Dev->>EC2: ssh vibecode-graviton (①)
         Dev->>EC2: ~/venv/bin/python3 ~/web-bridge/bridge.py
-        EC2-->>Dev: [bridge] ws://0.0.0.0:8765 / :8080
-        Dev->>EC2: ssh vibecode-graviton (ターミナル②)
-        Dev->>EC2: LD_PRELOAD=~/gpio_shim.so ~/gpio_led_button
-        loop LED 自動点滅 (100ms毎)
-            EC2->>EC2: Unix socket 経由で bridge へ LED 状態送信
-        end
+        EC2-->>Dev: [bridge] :8080 / :8765 / /tmp/hw_sim.sock
+        Dev->>EC2: ssh vibecode-graviton (②)
+        Dev->>EC2: sudo ~/cuse_i2c -f --devname=i2c-1
+        EC2-->>Dev: /dev/i2c-1 created
+        Dev->>EC2: ssh vibecode-graviton (③)
+        Dev->>EC2: LD_PRELOAD="~/gpio_shim.so ~/spi_shim.so" ~/sensor_demo
     end
 
     rect rgb(60, 50, 20)
-        Note over Dev,EC2: 【EC2】操作・観察
+        Note over Dev,Panel: 【EC2】操作・観察
         Dev->>Win: Antigravity: Remote-SSH → vibecode-graviton
-        Win->>EC2: SSH 接続 + ポート自動転送 (8080 / 8765)
-        Dev->>Win: PORTS タブ → 8080 を Simple Browser で開く
-        EC2-->>Win: LED 状態をリアルタイム送信
-        Win-->>Dev: LED 点滅をパネルで可視化
-        Dev->>Win: PUSH ボタンをクリック
-        Win->>EC2: {"type":"button","line":17,"value":1}
-        EC2-->>Win: LED トグル → パネル反映
+        Win->>EC2: SSH 接続 + ポート自動転送 (8080/8765)
+        Dev->>Win: PORTS → 8080 を Simple Browser で開く
+        EC2-->>Panel: LED / OLED framebuffer をリアルタイム送信
+        Dev->>Panel: PUSH (system ON) / Tap Card
+        Panel->>EC2: bridge 経由でアプリへ反映
+        EC2-->>Panel: OLED に UID 表示 + LED2 フラッシュ
     end
 
     rect rgb(20, 50, 60)
-        Note over GH,RPi: 【RasPi5】デプロイ
-        Dev->>GH: make deploy EC2=pi@raspberrypi KEY=~/.ssh/raspi.pem
-        GH->>RPi: scp gpio_led_button / cuse_i2c / vl53l0x_read
-        RPi-->>GH: "Deploy complete"
+        Note over Dev,RPi: 【RasPi5】デプロイ
+        Dev->>Win: .\raspi.ps1 deploy
+        Win->>GH: gh codespace cp で取得
+        Win->>RPi: adb push sensor_demo / shims / cuse_i2c / ...
     end
 
     rect rgb(30, 60, 50)
-        Note over Dev,RPi: 【RasPi5】実行
-        Dev->>RPi: ssh pi@raspberrypi
-        Dev->>RPi: ./gpio_led_button
-        loop LED 自動点滅 (100ms毎)
-            RPi->>RPi: 実 GPIO18 に出力 → LED 点滅
-        end
+        Note over Dev,RPi: 【RasPi5】実機実行
+        Dev->>Win: adb shell
+        Dev->>RPi: ~/sensor_demo
+        RPi->>RPi: 実 GPIO / 実 I2C OLED / 実 SPI RFID を直接制御
     end
 
     rect rgb(50, 60, 30)
         Note over Dev,RPi: 【RasPi5】操作・観察
         Dev->>RPi: 物理ボタン (GPIO17) を押す
-        RPi-->>Dev: 実 LED (GPIO18) がトグル点灯
+        RPi-->>Dev: 実 LED (GPIO18/24) / 実 OLED が反応
+        Dev->>RPi: RFID カードをかざす
+        RPi-->>Dev: OLED に UID 表示 + LED2 フラッシュ
     end
 ```
 
@@ -100,12 +104,21 @@ sequenceDiagram
 
 | フェーズ | 場所 | コマンド |
 |---|---|---|
+| GitHub CLI インストール | Windows PS | `winget install GitHub.cli` |
+| GitHub CLI 認証 | Windows PS | `gh auth login` |
+| AWS CLI インストール | Windows PS | `winget install Amazon.AWSCLI` |
+| AWS CLI 認証設定 | Windows PS | `aws configure` |
+| ADB (PlatformTools) インストール | Windows PS | `winget install Google.PlatformTools` |
+| EC2 起動 | Windows PS | `.\ec2.ps1 start` |
+| EC2 停止 | Windows PS | `.\ec2.ps1 stop` |
+| EC2 状態確認 | Windows PS | `.\ec2.ps1 status` |
 | Codespaces SSH | Windows PS | `gh codespace ssh --codespace <name>` |
-| クロスコンパイル | Codespaces | `cd cuse-stubs && make cross` |
-| EC2 へデプロイ | Codespaces | `make deploy EC2=vibecode-graviton` |
-| RasPi5 へデプロイ | Codespaces | `make deploy EC2=pi@raspberrypi KEY=~/.ssh/raspi.pem` |
-| EC2 シェルアクセス | Windows PS | `ssh vibecode-graviton` |
-| RasPi5 シェルアクセス | Windows PS | `ssh pi@raspberrypi` |
+| クロスコンパイル | Codespaces | `make cross` |
+| EC2 へデプロイ | Codespaces | `make deploy-ec2 EC2=vibecode-graviton` |
+| RasPi5 へデプロイ | Windows PS | `.\raspi.ps1 deploy` |
+| EC2 シェル | Windows PS | `ssh vibecode-graviton` |
+| RasPi5 シェル | Windows PS | `adb shell` |
 | ブリッジ起動 | EC2 | `~/venv/bin/python3 ~/web-bridge/bridge.py` |
-| GPIO デモ (EC2) | EC2 | `LD_PRELOAD=~/gpio_shim.so ~/gpio_led_button` |
-| GPIO デモ (RasPi5) | RasPi5 | `./gpio_led_button` |
+| I2C スタブ起動 | EC2 | `sudo ~/cuse_i2c -f --devname=i2c-1` |
+| アプリ実行 (EC2) | EC2 | `LD_PRELOAD="~/gpio_shim.so ~/spi_shim.so" ~/sensor_demo` |
+| アプリ実行 (RasPi5) | RasPi5 | `~/sensor_demo` |
